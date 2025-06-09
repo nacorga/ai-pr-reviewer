@@ -10,4 +10,4 @@ webhooks.on('pull_request', async ({ id, name, payload }) => {
   await githubService.handlePullRequest(payload as any);
 });
 
-export const webhookHandler = createNodeMiddleware(webhooks, { path: '/' });
+export const webhookHandler = createNodeMiddleware(webhooks, { path: '/webhook' });
