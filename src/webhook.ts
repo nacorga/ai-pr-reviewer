@@ -16,7 +16,12 @@ const logConfig = {
 
 const webhooks = new Webhooks({ 
   secret: config.github.secret,
-  log: logConfig
+  log: {
+    debug: (...args: any[]) => logConfig.debug('Webhook:', ...args),
+    info: (...args: any[]) => logConfig.info('Webhook:', ...args),
+    warn: (...args: any[]) => logConfig.warn('Webhook:', ...args),
+    error: (...args: any[]) => logConfig.error('Webhook:', ...args),
+  }
 });
 
 const githubService = new GitHubService();
@@ -61,5 +66,10 @@ webhooks.onError((error) => {
 // Middleware para Express
 export const webhookHandler = createNodeMiddleware(webhooks, { 
   path: '/webhook',
-  log: logConfig
+  log: {
+    debug: (...args: any[]) => logConfig.debug('Middleware:', ...args),
+    info: (...args: any[]) => logConfig.info('Middleware:', ...args),
+    warn: (...args: any[]) => logConfig.warn('Middleware:', ...args),
+    error: (...args: any[]) => logConfig.error('Middleware:', ...args),
+  }
 });
