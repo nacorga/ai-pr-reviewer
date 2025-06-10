@@ -20,7 +20,7 @@
     "cd"
   ],
   "author": "Ignacio Cortés García",
-  "license": "ISC",
+  "license": "MIT",
   "description": "",
   "dependencies": {
     "@octokit/rest": "^22.0.0",
