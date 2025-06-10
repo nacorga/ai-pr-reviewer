@@ -61,5 +61,10 @@ webhooks.onError((error) => {
 // Middleware para Express
 export const webhookHandler = createNodeMiddleware(webhooks, { 
   path: '/webhook',
-  log: logConfig
+  log: {
+    debug: () => {}, // Deshabilitamos el logging del middleware
+    info: () => {},
+    warn: () => {},
+    error: () => {}
+  }
 });
