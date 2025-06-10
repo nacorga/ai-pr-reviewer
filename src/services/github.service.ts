@@ -48,7 +48,6 @@ export class GitHubService {
           const lines = file.patch.split('\n');
 
           let currentLine = 0;
-          let contextLines = 0;
 
           for (const line of lines) {
             if (line.startsWith('@@')) {
@@ -56,19 +55,18 @@ export class GitHubService {
 
               if (match) {
                 currentLine = parseInt(match[1], 10);
-                contextLines = 0;
               }
             } else if (line.startsWith('+')) {
               patches.push({
                 path: file.filename,
-                line: currentLine + contextLines - 1,
+                line: currentLine,
                 content: line.substring(1),
               });
-              contextLines++;
+              currentLine++;
             } else if (line.startsWith('-')) {
-              contextLines++;
+              // Removed lines do not advance the new file's line counter
             } else {
-              contextLines++;
+              currentLine++;
             }
           }
         }
