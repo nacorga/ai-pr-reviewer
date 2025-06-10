@@ -41,42 +41,51 @@ export class GitHubService {
     owner: string,
     repo: string,
     pull_number: number,
-  ): Promise<Array<{ path: string; line: number; position: number; content: string }>> {
-    const patches: Array<{ path: string; line: number; position: number; content: string }> = [];
+  ): Promise<Array<{ path: string; line: number; position: number; commitId: string; content: string }>> {
+    const patches: Array<{ path: string; line: number; position: number; commitId: string; content: string }> = [];
 
-    for await (const resp of this.octokit.paginate.iterator(this.octokit.pulls.listFiles, {
+    for await (const resp of this.octokit.paginate.iterator(this.octokit.pulls.listCommits, {
       owner,
       repo,
       pull_number,
     })) {
-      for (const file of resp.data) {
-        if (file.patch) {
-          const lines = file.patch.split('\n');
+      for (const commit of resp.data) {
+        const { data: commitData } = await this.octokit.repos.getCommit({
+          owner,
+          repo,
+          ref: commit.sha,
+        });
 
-          let currentLine = 0;
-          let position = 0;
+        for (const file of commitData.files ?? []) {
+          if (file.patch) {
+            const lines = file.patch.split('\n');
 
-          for (const line of lines) {
-            if (line.startsWith('@@')) {
-              const match = line.match(/@@ -\d+,?\d* \+(\d+),?\d* @@/);
+            let currentLine = 0;
+            let position = 0;
 
-              if (match) {
-                currentLine = parseInt(match[1], 10);
-              }
-            } else {
-              position++;
-              if (line.startsWith('+')) {
-                patches.push({
-                  path: file.filename,
-                  line: currentLine,
-                  position,
-                  content: line.substring(1),
-                });
-                currentLine++;
-              } else if (line.startsWith('-')) {
-                // Removed lines do not advance the new file's line counter
+            for (const line of lines) {
+              if (line.startsWith('@@')) {
+                const match = line.match(/@@ -\d+,?\d* \+(\d+),?\d* @@/);
+
+                if (match) {
+                  currentLine = parseInt(match[1], 10);
+                }
               } else {
-                currentLine++;
+                position++;
+                if (line.startsWith('+')) {
+                  patches.push({
+                    path: file.filename,
+                    line: currentLine,
+                    position,
+                    commitId: commit.sha,
+                    content: line.substring(1),
+                  });
+                  currentLine++;
+                } else if (line.startsWith('-')) {
+                  // Removed lines do not advance the new file's line counter
+                } else {
+                  currentLine++;
+                }
               }
             }
           }
@@ -92,7 +101,13 @@ export class GitHubService {
     repo: string,
     pull_number: number,
     comments: Array<{ path: string; line: number; message: string }>,
-    patches: Array<{ path: string; line: number; position: number; content: string }>,
+    patches: Array<{
+      path: string;
+      line: number;
+      position: number;
+      commitId: string;
+      content: string;
+    }>,
   ) {
     const { data: pr } = await this.octokit.pulls.get({ owner, repo, pull_number });
 
@@ -102,13 +117,13 @@ export class GitHubService {
       pull_number,
     });
 
-    const patchMap = new Map<string, Map<number, number>>();
+    const patchMap = new Map<string, Map<number, { position: number; commitId: string }>>();
 
     for (const p of patches) {
       if (!patchMap.has(p.path)) {
         patchMap.set(p.path, new Map());
       }
-      patchMap.get(p.path)!.set(p.line, p.position);
+      patchMap.get(p.path)!.set(p.line, { position: p.position, commitId: p.commitId });
     }
 
     for (const c of comments) {
@@ -116,17 +131,17 @@ export class GitHubService {
         (existing) => existing.path === c.path && existing.line === c.line && existing.body === c.message,
       );
 
-      const position = patchMap.get(c.path)?.get(c.line);
+      const patch = patchMap.get(c.path)?.get(c.line);
 
-      if (position && !isDuplicate) {
+      if (patch && !isDuplicate) {
         await this.octokit.pulls.createReviewComment({
           owner,
           repo,
           pull_number,
           body: c.message,
           path: c.path,
-          commit_id: pr.head.sha,
-          position,
+          commit_id: patch.commitId,
+          position: patch.position,
         });
       }
     }
