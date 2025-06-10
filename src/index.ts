@@ -24,14 +24,14 @@ const githubSrv = new GitHubService();
 webhooks.on('pull_request', async ({ payload }) => {
   try {
     await githubSrv.handlePullRequest(payload as any);
-    console.log(`✅ Pull request ${payload.pull_request.number} handled`);
+    console.log(`[PR Review] Successfully processed PR #${payload.pull_request.number} in ${payload.repository.full_name} (${payload.action})`);
   } catch (error: any) {
-    console.error(`❌ Error handling pull request:`, error.message);
+    console.error(`[PR Review] Failed to process PR #${payload.pull_request.number} in ${payload.repository.full_name}:`, error.message);
   }
 });
 
 webhooks.onError((event) => {
-  console.error(`❌ Error handling webhook:`, event.errors);
+  console.error('[Webhook] Error processing webhook event:', event.errors);
 });
 
 const middleware = createNodeMiddleware(webhooks, { path: '/webhooks' });
@@ -46,5 +46,5 @@ createServer(async (req: IncomingMessage, res: ServerResponse) => {
   res.writeHead(404, { 'Content-Type': 'text/plain' });
   res.end('Not Found');
 }).listen(port, () => {
-  console.log(`🚀 Server listening on http://localhost:${port}/webhooks`);
+  console.log(`[Server] Ready to receive webhooks at http://localhost:${port}/webhooks`);
 });

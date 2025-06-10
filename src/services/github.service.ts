@@ -8,17 +8,21 @@ export class GitHubService {
   async handlePullRequest(payload: any) {
     const { action, pull_request: pr, repository: repo } = payload;
 
-    console.log(`PR ${action}: ${repo.full_name}#${pr.number}`);
+    console.log(`[GitHub] Processing PR #${pr.number} in ${repo.full_name} (${action})`);
 
     if (!['opened', 'reopened', 'synchronize'].includes(action)) {
+      console.log(`[GitHub] Skipping PR #${pr.number} - action '${action}' not supported`);
       return;
     }
 
     const patches = await this.collectPatches(repo.owner.login, repo.name, pr.number);
 
     if (!patches.length) {
+      console.log(`[GitHub] No changes found to review in PR #${pr.number}`);
       return;
     }
+
+    console.log(`[GitHub] Found ${patches.length} changes to review in PR #${pr.number}`);
 
     const comments = await this.openai.reviewPatches(patches);
 
