@@ -16,7 +16,15 @@ app.get('/health', (_req, res) => {
   res.status(200).json({ status: 'ok' });
 });
 
-app.post('/webhook', webhookHandler);
+app.use(webhookHandler);
+
+app.use((err: Error, _req: express.Request, res: express.Response, next: express.NextFunction) => {
+  console.error('Error:', err);
+  res.status(500).json({
+    error: 'Internal Server Error',
+    message: process.env.NODE_ENV === 'development' ? err.message : 'Something went wrong'
+  });
+});
 
 app.listen(config.port, () => {
   console.log(`🚀 Server listening on port ${config.port}`);
