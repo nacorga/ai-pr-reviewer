@@ -55,8 +55,7 @@ jobs:
             --release-as patch \
             --releaseCommitMessageFormat "chore(release): {{currentTag}} [skip ci]" \
             --no-verify \
-            --tag-prefix "v" \
-            --sign
+            --tag-prefix "v"
           git push --follow-tags origin main
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
