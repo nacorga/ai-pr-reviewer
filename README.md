@@ -73,16 +73,20 @@ The bot will automatically trigger when:
 ## Development
 
 ```bash
-# Start the project
-npm run start
-
 # Build the project
 npm run build
+
+# Start the project
+npm run start
 ```
 
 ## Contributing
 
 Contributions are welcome. Please open an issue first to discuss what you would like to change.
+
+## Privacy Notice
+
+This tool sends code changes to the OpenAI API for analysis. Review your privacy requirements and filter any sensitive information before sending.
 
 ## License
 
