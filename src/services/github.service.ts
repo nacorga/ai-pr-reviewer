@@ -10,7 +10,7 @@ export class GitHubService {
 
     console.log(`PR ${action}: ${repo.full_name}#${pr.number}`);
 
-    if (!['opened', 'edited', 'synchronize'].includes(action)) {
+    if (!['opened', 'synchronize'].includes(action)) {
       return;
     }
 

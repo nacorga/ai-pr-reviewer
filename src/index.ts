@@ -21,7 +21,7 @@ const webhooks = new Webhooks({ secret: process.env.GITHUB_WEBHOOK_SECRET as str
 
 const githubSrv = new GitHubService();
 
-webhooks.on('pull_request.opened', async ({ id, name, payload }) => {
+webhooks.on('pull_request', async ({ payload }) => {
   try {
     await githubSrv.handlePullRequest(payload as any);
     console.log(`✅ Pull request ${payload.pull_request.number} handled`);

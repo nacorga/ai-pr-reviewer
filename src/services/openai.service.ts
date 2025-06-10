@@ -53,6 +53,7 @@ ${JSON.stringify(patches, null, 2)}`;
       if (!content) return [];
 
       const parsed = JSON.parse(content);
+
       return parsed.reviews || [];
     } catch (error) {
       console.error('Failed to parse OpenAI JSON:', resp.choices[0].message.content);
