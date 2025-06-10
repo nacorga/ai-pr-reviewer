@@ -108,17 +108,20 @@ export class GitHubService {
       if (!patchMap.has(p.path)) {
         patchMap.set(p.path, new Set());
       }
+
       patchMap.get(p.path)!.add(p.line);
     }
 
     for (const c of comments) {
-      const isDuplicate = existingComments.some(
-        (existing) => existing.path === c.path && existing.line === c.line && existing.body === c.message,
-      );
+      const isDuplicate = existingComments.some((existing) => existing.path === c.path && existing.body === c.message);
 
       const isInPatch = patchMap.get(c.path)?.has(c.line);
 
       if (isInPatch && !isDuplicate) {
+        const patch = patches.find((p) => p.path === c.path && p.line === c.line);
+
+        if (!patch) continue;
+
         await this.octokit.pulls.createReviewComment({
           owner,
           repo,
@@ -126,8 +129,7 @@ export class GitHubService {
           body: c.message,
           path: c.path,
           commit_id: pr.head.sha,
-          line: c.line,
-          side: 'RIGHT',
+          position: patch.position,
         });
       }
     }
