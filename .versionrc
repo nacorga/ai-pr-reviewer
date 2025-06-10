@@ -22,5 +22,5 @@
     "tag": false
   },
   "header": "# 📦 Changelog\n\nAll notable changes to this project will be documented in this file.",
-  "preset": "node"
+  "preset": "conventionalcommits"
 } 
