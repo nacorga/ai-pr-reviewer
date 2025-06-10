@@ -102,13 +102,13 @@ export class GitHubService {
       pull_number,
     });
 
-    const positionMap = new Map<string, Map<number, number>>();
+    const patchMap = new Map<string, Set<number>>();
 
     for (const p of patches) {
-      if (!positionMap.has(p.path)) {
-        positionMap.set(p.path, new Map());
+      if (!patchMap.has(p.path)) {
+        patchMap.set(p.path, new Set());
       }
-      positionMap.get(p.path)!.set(p.line, p.position);
+      patchMap.get(p.path)!.add(p.line);
     }
 
     for (const c of comments) {
@@ -116,17 +116,18 @@ export class GitHubService {
         (existing) => existing.path === c.path && existing.line === c.line && existing.body === c.message,
       );
 
-      const position = positionMap.get(c.path)?.get(c.line);
+      const isInPatch = patchMap.get(c.path)?.has(c.line);
 
-      if (position && !isDuplicate) {
+      if (isInPatch && !isDuplicate) {
         await this.octokit.pulls.createReviewComment({
           owner,
           repo,
           pull_number,
           body: c.message,
           path: c.path,
-          position,
           commit_id: pr.head.sha,
+          line: c.line,
+          side: 'RIGHT',
         });
       }
     }
