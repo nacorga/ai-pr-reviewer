@@ -24,9 +24,14 @@ const githubSrv = new GitHubService();
 webhooks.on('pull_request', async ({ payload }) => {
   try {
     await githubSrv.handlePullRequest(payload as any);
-    console.log(`[PR Review] Successfully processed PR #${payload.pull_request.number} in ${payload.repository.full_name} (${payload.action})`);
+    console.log(
+      `[PR Review] Successfully processed PR #${payload.pull_request.number} in ${payload.repository.full_name} (${payload.action})`,
+    );
   } catch (error: any) {
-    console.error(`[PR Review] Failed to process PR #${payload.pull_request.number} in ${payload.repository.full_name}:`, error.message);
+    console.error(
+      `[PR Review] Failed to process PR #${payload.pull_request.number} in ${payload.repository.full_name}:`,
+      error.message,
+    );
   }
 });
 
