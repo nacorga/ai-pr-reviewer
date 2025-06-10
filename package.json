@@ -7,7 +7,7 @@
     "start": "node dist/index.js",
     "format": "prettier --write \"src/**/*.ts\"",
     "release": "standard-version",
-    "prepare": "husky"
+    "prepare": "husky install"
   },
   "keywords": [],
   "author": "",
