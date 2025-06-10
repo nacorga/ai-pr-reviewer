@@ -1,19 +1,48 @@
 import OpenAI from 'openai';
-import { config } from '../config';
 
 export class OpenAIService {
-  private client = new OpenAI({ apiKey: config.openaiApiKey });
+  private client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY as string });
 
-  async reviewPatches(patches: string):
-    Promise<Array<{ path: string; line: number; message: string }>> {
+  async reviewPatches(patches: string): Promise<Array<{ path: string; line: number; message: string }>> {
+    const prompt = `You are a senior software engineer with extensive experience in code review and security analysis. Your task is to review git patches and provide detailed feedback.
 
-    const prompt = `You are a senior engineer. Review these git patches and identify issues, style or security risks. ` +
-      `Return a JSON array of objects with keys: path (file path), line (line number), and message (feedback). Patches:\n${patches}`;
+System Instructions:
+- Return a JSON object with a single key "reviews" containing an array of review objects
+- Each review object must have exactly these keys:
+  * "path" (string): The file path being reviewed
+  * "line" (number): The line number where the issue was found
+  * "message" (string): Clear, actionable feedback about the issue
+
+Example Output Format:
+{
+  "reviews": [
+    {
+      "path": "src/components/Button.tsx",
+      "line": 15,
+      "message": "Missing type annotation for onClick prop. Add React.MouseEventHandler type."
+    },
+    {
+      "path": "src/utils/auth.ts",
+      "line": 42,
+      "message": "Security risk: API key is exposed in error message. Remove sensitive data from error logging."
+    }
+  ]
+}
+
+Review Guidelines:
+1. Focus on code quality, security risks, and potential bugs
+2. Be specific and actionable in your feedback
+3. Include line numbers for each issue
+4. Prioritize critical issues over style suggestions
+
+Patches to review:
+${patches}`;
 
     const resp = await this.client.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [{ role: 'user', content: prompt }],
       temperature: 0,
+      response_format: { type: 'json_object' },
     });
 
     try {
@@ -21,7 +50,8 @@ export class OpenAIService {
 
       if (!content) return [];
 
-      return JSON.parse(content);
+      const parsed = JSON.parse(content);
+      return parsed.reviews || [];
     } catch (error) {
       console.error('Failed to parse OpenAI JSON:', resp.choices[0].message.content);
 
