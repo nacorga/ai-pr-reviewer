@@ -76,16 +76,31 @@ export class GitHubService {
   ) {
     const { data: pr } = await this.octokit.pulls.get({ owner, repo, pull_number });
 
+    const { data: existingComments } = await this.octokit.pulls.listReviewComments({
+      owner,
+      repo,
+      pull_number,
+    });
+
     for (const c of comments) {
-      await this.octokit.pulls.createReviewComment({
-        owner,
-        repo,
-        pull_number,
-        body: c.message,
-        path: c.path,
-        line: c.line,
-        commit_id: pr.head.sha,
-      });
+      const isDuplicate = existingComments.some(
+        (existing) =>
+          existing.path === c.path &&
+          existing.line === c.line &&
+          existing.body === c.message
+      );
+
+      if (!isDuplicate) {
+        await this.octokit.pulls.createReviewComment({
+          owner,
+          repo,
+          pull_number,
+          body: c.message,
+          path: c.path,
+          line: c.line,
+          commit_id: pr.head.sha,
+        });
+      }
     }
   }
 }
