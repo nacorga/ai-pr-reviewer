@@ -32,7 +32,7 @@ export class OpenAIService {
     const allReviews: Array<{ path: string; line: number; message: string }> = [];
 
     for (const chunk of chunks) {
-      const prompt = PR_REVIEW_PROMPT(patches);
+      const prompt = PR_REVIEW_PROMPT(chunk);
 
       const resp = await this.client.chat.completions.create({
         model: 'gpt-4o-mini',

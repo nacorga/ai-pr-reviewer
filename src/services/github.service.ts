@@ -26,17 +26,23 @@ export class GitHubService {
 
     console.log(`[GitHub] Found ${patches.length} changes to review in PR #${pr.number}`);
 
-    const comments = await this.openai.reviewPatches(patches);
+    const aiPatches = patches.map(({ path, line, content }) => ({
+      path,
+      line,
+      content,
+    }));
 
-    await this.postComments(repo.owner.login, repo.name, pr.number, comments);
+    const comments = await this.openai.reviewPatches(aiPatches);
+
+    await this.postComments(repo.owner.login, repo.name, pr.number, comments, patches);
   }
 
   private async collectPatches(
     owner: string,
     repo: string,
     pull_number: number,
-  ): Promise<Array<{ path: string; line: number; content: string }>> {
-    const patches: Array<{ path: string; line: number; content: string }> = [];
+  ): Promise<Array<{ path: string; line: number; position: number; content: string }>> {
+    const patches: Array<{ path: string; line: number; position: number; content: string }> = [];
 
     for await (const resp of this.octokit.paginate.iterator(this.octokit.pulls.listFiles, {
       owner,
@@ -48,6 +54,7 @@ export class GitHubService {
           const lines = file.patch.split('\n');
 
           let currentLine = 0;
+          let position = 0;
 
           for (const line of lines) {
             if (line.startsWith('@@')) {
@@ -56,17 +63,21 @@ export class GitHubService {
               if (match) {
                 currentLine = parseInt(match[1], 10);
               }
-            } else if (line.startsWith('+')) {
-              patches.push({
-                path: file.filename,
-                line: currentLine,
-                content: line.substring(1),
-              });
-              currentLine++;
-            } else if (line.startsWith('-')) {
-              // Removed lines do not advance the new file's line counter
             } else {
-              currentLine++;
+              position++;
+              if (line.startsWith('+')) {
+                patches.push({
+                  path: file.filename,
+                  line: currentLine,
+                  position,
+                  content: line.substring(1),
+                });
+                currentLine++;
+              } else if (line.startsWith('-')) {
+                // Removed lines do not advance the new file's line counter
+              } else {
+                currentLine++;
+              }
             }
           }
         }
@@ -81,6 +92,7 @@ export class GitHubService {
     repo: string,
     pull_number: number,
     comments: Array<{ path: string; line: number; message: string }>,
+    patches: Array<{ path: string; line: number; position: number; content: string }>,
   ) {
     const { data: pr } = await this.octokit.pulls.get({ owner, repo, pull_number });
 
@@ -90,19 +102,30 @@ export class GitHubService {
       pull_number,
     });
 
+    const positionMap = new Map<string, Map<number, number>>();
+
+    for (const p of patches) {
+      if (!positionMap.has(p.path)) {
+        positionMap.set(p.path, new Map());
+      }
+      positionMap.get(p.path)!.set(p.line, p.position);
+    }
+
     for (const c of comments) {
       const isDuplicate = existingComments.some(
         (existing) => existing.path === c.path && existing.line === c.line && existing.body === c.message,
       );
 
-      if (!isDuplicate) {
+      const position = positionMap.get(c.path)?.get(c.line);
+
+      if (position && !isDuplicate) {
         await this.octokit.pulls.createReviewComment({
           owner,
           repo,
           pull_number,
           body: c.message,
           path: c.path,
-          line: c.line,
+          position,
           commit_id: pr.head.sha,
         });
       }
