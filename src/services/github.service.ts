@@ -97,14 +97,12 @@ export class GitHubService {
     comments: Array<{ path: string; line: number; message: string }>,
     patches: Array<{ path: string; line: number; position: number; content: string }>,
   ) {
-    // Obtiene el SHA más reciente del PR
     const { data: pr } = await this.octokit.rest.pulls.get({
       owner,
       repo,
       pull_number,
     });
 
-    // Carga comentarios ya existentes para evitar duplicados
     const { data: existingComments } = await this.octokit.rest.pulls.listReviewComments({
       owner,
       repo,
@@ -112,24 +110,28 @@ export class GitHubService {
     });
 
     for (const c of comments) {
-      // Busca el patch que corresponde a esta sugerencia
       const patch = patches.find((p) => p.path === c.path && p.line === c.line);
-      if (!patch) continue;
 
-      // Evita repostear exactos duplicados (mismo path, position y body)
+      if (!patch) {
+        continue;
+      }
+
       const isDuplicate = existingComments.some(
-        (ec) => ec.path === c.path && ec.position === patch.position && ec.body === c.message,
+        (ec) => ec.path === c.path && ec.line === c.line && ec.body === c.message,
       );
-      if (isDuplicate) continue;
 
-      // Publica el comentario usando position en el diff
+      if (isDuplicate) {
+        continue;
+      }
+
       await this.octokit.rest.pulls.createReviewComment({
         owner,
         repo,
         pull_number,
         commit_id: pr.head.sha,
         path: c.path,
-        position: patch.position,
+        line: c.line,
+        side: 'RIGHT',
         body: c.message,
       });
     }
