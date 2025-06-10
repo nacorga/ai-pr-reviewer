@@ -7,7 +7,18 @@ const githubService = new GitHubService();
 
 webhooks.on('pull_request', async ({ id, name, payload }) => {
   console.log(`Received event ${name} (${id})`);
-  await githubService.handlePullRequest(payload as any);
+  console.log('Payload:', JSON.stringify(payload, null, 2));
+
+  try {
+    await githubService.handlePullRequest(payload as any);
+    console.log('Successfully processed webhook');
+  } catch (error) {
+    console.error('Error processing webhook:', error);
+  }
+});
+
+webhooks.onError((error) => {
+  console.error('Webhook error:', error);
 });
 
 export const webhookHandler = createNodeMiddleware(webhooks, { path: '/webhook' });
