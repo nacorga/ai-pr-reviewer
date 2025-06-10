@@ -1,55 +1,23 @@
-# PR Reviewer
+# AI PR Reviewer
 
 An automated bot that reviews GitHub Pull Requests using OpenAI to provide comments and improvement suggestions.
 
 ## Features
 
 - Automatic Pull Request review
-- Code analysis using OpenAI
+- Code analysis using OpenAI API
 - Detailed comments on modified files
 - GitHub integration via webhooks
+- Support for PR events: opening, reopening, and synchronization
 
 ## Purpose
 
 This application was developed to automate the code review process in GitHub repositories. It helps development teams by:
 
-- Reducing the time spent on manual code reviews
+- Reducing time spent on manual code reviews
 - Providing consistent and objective feedback
 - Identifying potential issues and improvements
-- Ensuring code quality standards are maintained
-- Supporting both small and large codebases
-
-## Usage Instructions
-
-### Basic Usage
-
-1. Once configured, the bot will automatically review any new or updated Pull Requests in your repository.
-
-2. The bot will analyze:
-   - Code changes
-   - File modifications
-   - Overall PR structure
-
-3. Review comments will be posted directly on the PR with:
-   - Line-specific suggestions
-   - Code improvement recommendations
-   - Best practices reminders
-   - Potential issues or bugs
-
-### Customization
-
-You can customize the bot's behavior by:
-
-1. Adjusting the OpenAI parameters in your configuration
-2. Modifying the webhook settings to trigger on specific events
-3. Setting up branch protection rules to require reviews
-
-### Best Practices
-
-- Keep PRs focused and manageable in size
-- Respond to bot comments when clarification is needed
-- Use the feedback to improve code quality
-- Consider the bot's suggestions as part of your review process
+- Maintaining code quality standards
 
 ## Requirements
 
@@ -61,8 +29,8 @@ You can customize the bot's behavior by:
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/your-username/pr-reviewer.git
-cd pr-reviewer
+git clone https://github.com/your-username/ai-pr-reviewer.git
+cd ai-pr-reviewer
 ```
 
 2. Install dependencies:
@@ -70,20 +38,28 @@ cd pr-reviewer
 npm install
 ```
 
-3. Configure environment variables:
+3. Create and set up environment variables:
 ```bash
-cp .env.example .env
+# Create a new .env file
+touch .env
 ```
 
-Edit the `.env` file with your credentials:
+Add the following environment variables to your `.env` file:
 ```
+# Required: Your GitHub webhook secret for verifying webhook payloads
+GITHUB_WEBHOOK_SECRET=your_webhook_secret
+
+# Required: Your GitHub personal access token with repo scope
+GITHUB_TOKEN=your_github_token
+
+# Required: Your OpenAI API key for code analysis
 OPENAI_API_KEY=your_openai_api_key
 ```
 
 4. Configure the webhook in your GitHub repository:
    - Go to Settings > Webhooks
    - Add a new webhook
-   - URL: `https://your-domain.com/webhook`
+   - URL: `https://your-domain.com/webhooks`
    - Content type: `application/json`
    - Events: Select "Pull request"
 
@@ -91,7 +67,7 @@ OPENAI_API_KEY=your_openai_api_key
 
 The bot will automatically trigger when:
 - A new Pull Request is opened
-- An existing Pull Request is edited
+- An existing Pull Request is reopened
 - A Pull Request is synchronized with new commits
 
 ## Development
