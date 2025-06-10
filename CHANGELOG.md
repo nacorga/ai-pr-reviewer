@@ -1,6 +1,13 @@
 # 📦 Changelog
 
 All notable changes to this project will be documented in this file.
+### [1.0.3](https://github.com/nacorga/ai-pr-reviewer/compare/v1.0.2...v1.0.3) (2025-06-10)
+
+
+### Bug Fixes
+
+* remove signing option from versioning workflow to streamline release process ([5baaf4e](https://github.com/nacorga/ai-pr-reviewer/commit/5baaf4ebc7b18a9d98b8df6f1276d51c77ff6042))
+
 ### 1.0.2 (2025-06-10)
 
 ### 1.0.1 (2025-06-10)
