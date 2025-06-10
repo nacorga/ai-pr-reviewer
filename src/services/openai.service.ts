@@ -3,7 +3,9 @@ import OpenAI from 'openai';
 export class OpenAIService {
   private client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY as string });
 
-  async reviewPatches(patches: Array<{ path: string; line: number; content: string }>): Promise<Array<{ path: string; line: number; message: string }>> {
+  async reviewPatches(
+    patches: Array<{ path: string; line: number; content: string }>,
+  ): Promise<Array<{ path: string; line: number; message: string }>> {
     const prompt = `You are a senior software engineer with extensive experience in code review and security analysis. Your task is to review code changes and provide detailed feedback.
 
 System Instructions:

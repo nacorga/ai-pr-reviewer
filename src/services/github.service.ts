@@ -25,7 +25,11 @@ export class GitHubService {
     await this.postComments(repo.owner.login, repo.name, pr.number, comments);
   }
 
-  private async collectPatches(owner: string, repo: string, pull_number: number): Promise<Array<{ path: string; line: number; content: string }>> {
+  private async collectPatches(
+    owner: string,
+    repo: string,
+    pull_number: number,
+  ): Promise<Array<{ path: string; line: number; content: string }>> {
     const patches: Array<{ path: string; line: number; content: string }> = [];
 
     for await (const resp of this.octokit.paginate.iterator(this.octokit.pulls.listFiles, {
@@ -39,7 +43,7 @@ export class GitHubService {
 
           let currentLine = 0;
           let contextLines = 0;
-          
+
           for (const line of lines) {
             if (line.startsWith('@@')) {
               const match = line.match(/@@ -\d+,?\d* \+(\d+),?\d* @@/);
@@ -52,7 +56,7 @@ export class GitHubService {
               patches.push({
                 path: file.filename,
                 line: currentLine + contextLines - 1,
-                content: line.substring(1)
+                content: line.substring(1),
               });
               contextLines++;
             } else if (line.startsWith('-')) {
@@ -84,10 +88,7 @@ export class GitHubService {
 
     for (const c of comments) {
       const isDuplicate = existingComments.some(
-        (existing) =>
-          existing.path === c.path &&
-          existing.line === c.line &&
-          existing.body === c.message
+        (existing) => existing.path === c.path && existing.line === c.line && existing.body === c.message,
       );
 
       if (!isDuplicate) {
