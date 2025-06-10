@@ -1,6 +1,6 @@
 {
   "name": "ai-pr-reviewer",
-  "version": "1.0.1",
+  "version": "1.0.0",
   "main": "index.js",
   "scripts": {
     "build": "tsc",
@@ -9,8 +9,17 @@
     "release": "standard-version",
     "prepare": "husky install"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": [
+    "github",
+    "actions",
+    "workflow",
+    "version",
+    "release",
+    "automation",
+    "ci",
+    "cd"
+  ],
+  "author": "Ignacio Cortés García",
   "license": "ISC",
   "description": "",
   "dependencies": {
