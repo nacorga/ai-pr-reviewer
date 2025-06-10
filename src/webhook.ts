@@ -6,55 +6,60 @@ if (!config.github.secret) {
   throw new Error('GitHub webhook secret is not configured');
 }
 
+// Configuración de logging común
+const logConfig = {
+  debug: (...args: any[]) => console.log('[DEBUG]', ...args),
+  info: (...args: any[]) => console.log('[INFO]', ...args),
+  warn: (...args: any[]) => console.warn('[WARN]', ...args),
+  error: (...args: any[]) => console.error('[ERROR]', ...args),
+};
+
 const webhooks = new Webhooks({ 
   secret: config.github.secret,
-  log: {
-    debug: (...args) => console.debug('[Webhook Debug]', ...args),
-    info: (...args) => console.info('[Webhook Info]', ...args),
-    warn: (...args) => console.warn('[Webhook Warning]', ...args),
-    error: (...args) => console.error('[Webhook Error]', ...args),
-  }
+  log: logConfig
 });
 
 const githubService = new GitHubService();
 
 // Manejador para todos los eventos
 webhooks.onAny(({ id, name, payload }) => {
-  console.log(`[${new Date().toISOString()}] Received ${name} event (${id})`);
+  logConfig.info(`Received ${name} event (${id})`);
+  logConfig.debug('Payload:', JSON.stringify(payload, null, 2));
 });
 
 // Manejador específico para pull requests
 webhooks.on('pull_request', async ({ id, name, payload }) => {
-  console.log(`[${new Date().toISOString()}] Processing pull request event (${id})`);
+  logConfig.info(`Processing pull request event (${id})`);
+  logConfig.debug('PR Details:', {
+    action: payload.action,
+    number: payload.pull_request.number,
+    title: payload.pull_request.title,
+    repository: payload.repository.full_name,
+    branch: `${payload.pull_request.head.ref} -> ${payload.pull_request.base.ref}`
+  });
   
   try {
     await githubService.handlePullRequest(payload as any);
-    console.log(`[${new Date().toISOString()}] Successfully processed pull request webhook`);
+    logConfig.info(`Successfully processed pull request webhook (${id})`);
   } catch (error) {
-    console.error(`[${new Date().toISOString()}] Error processing pull request webhook:`, error);
-    throw error; // Re-lanzar para que el manejador de errores lo capture
+    logConfig.error(`Error processing pull request webhook (${id}):`, error);
+    throw error;
   }
 });
 
 // Manejador para el evento ping (verificación de webhook)
 webhooks.on('ping', ({ id, name }) => {
-  console.log(`[${new Date().toISOString()}] Received ping event (${id})`);
-  console.log('Webhook is properly configured!');
+  logConfig.info(`Received ping event (${id})`);
+  logConfig.info('Webhook is properly configured!');
 });
 
 // Manejador de errores global
 webhooks.onError((error) => {
-  console.error(`[${new Date().toISOString()}] Webhook error:`, error);
-  // Aquí podrías agregar integración con servicios de monitoreo como Sentry
+  logConfig.error('Webhook error:', error);
 });
 
 // Middleware para Express
 export const webhookHandler = createNodeMiddleware(webhooks, { 
   path: '/webhook',
-  log: {
-    debug: (...args) => console.debug('[Middleware Debug]', ...args),
-    info: (...args) => console.info('[Middleware Info]', ...args),
-    warn: (...args) => console.warn('[Middleware Warning]', ...args),
-    error: (...args) => console.error('[Middleware Error]', ...args),
-  }
+  log: logConfig
 });
