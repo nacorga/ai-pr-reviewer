@@ -16,7 +16,7 @@ export class GitHubService {
 
     const patches = await this.collectPatches(repo.owner.login, repo.name, pr.number);
 
-    if (!patches) {
+    if (!patches.length) {
       return;
     }
 
@@ -25,8 +25,8 @@ export class GitHubService {
     await this.postComments(repo.owner.login, repo.name, pr.number, comments);
   }
 
-  private async collectPatches(owner: string, repo: string, pull_number: number): Promise<string> {
-    let patches = '';
+  private async collectPatches(owner: string, repo: string, pull_number: number): Promise<Array<{ path: string; line: number; content: string }>> {
+    const patches: Array<{ path: string; line: number; content: string }> = [];
 
     for await (const resp of this.octokit.paginate.iterator(this.octokit.pulls.listFiles, {
       owner,
@@ -34,7 +34,34 @@ export class GitHubService {
       pull_number,
     })) {
       for (const file of resp.data) {
-        if (file.patch) patches += `\n// File: ${file.filename}\n${file.patch}\n`;
+        if (file.patch) {
+          const lines = file.patch.split('\n');
+
+          let currentLine = 0;
+          let contextLines = 0;
+          
+          for (const line of lines) {
+            if (line.startsWith('@@')) {
+              const match = line.match(/@@ -\d+,?\d* \+(\d+),?\d* @@/);
+
+              if (match) {
+                currentLine = parseInt(match[1], 10);
+                contextLines = 0;
+              }
+            } else if (line.startsWith('+')) {
+              patches.push({
+                path: file.filename,
+                line: currentLine + contextLines - 1,
+                content: line.substring(1)
+              });
+              contextLines++;
+            } else if (line.startsWith('-')) {
+              contextLines++;
+            } else {
+              contextLines++;
+            }
+          }
+        }
       }
     }
 
