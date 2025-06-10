@@ -12,6 +12,7 @@ export class GitHubService {
 
     if (!['opened', 'reopened', 'synchronize'].includes(action)) {
       console.log(`[GitHub] Skipping PR #${pr.number} - action '${action}' not supported`);
+
       return;
     }
 
@@ -19,6 +20,7 @@ export class GitHubService {
 
     if (!patches.length) {
       console.log(`[GitHub] No changes found to review in PR #${pr.number}`);
+
       return;
     }
 

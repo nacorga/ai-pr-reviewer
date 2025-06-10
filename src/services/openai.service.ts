@@ -57,6 +57,7 @@ ${JSON.stringify(patches, null, 2)}`;
       return parsed.reviews || [];
     } catch (error: any) {
       console.error('[OpenAI] Failed to parse review response:', error.message);
+
       return [];
     }
   }
