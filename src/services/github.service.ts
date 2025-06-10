@@ -24,7 +24,6 @@ export class GitHubService {
 
     console.log(`[GitHub] Processing PR #${pr.number} (${action})`);
 
-    // 1) Extrae todos los parches de adición (+) del PR
     const patches = await this.collectPatches(repo.owner.login, repo.name, pr.number);
     if (patches.length === 0) {
       console.log(`[GitHub] No changes in PR #${pr.number}`);
@@ -32,19 +31,16 @@ export class GitHubService {
     }
 
     console.log(`[GitHub] Reviewing ${patches.length} changed lines in PR #${pr.number}`);
-    // 2) Llama a OpenAI para generar sugerencias
-    const suggestions: CommentSuggestion[] = await this.openai.reviewPatches(
+    const suggestions = await this.openai.reviewPatches(
       patches.map(({ path, line, content }) => ({ path, line, content })),
     );
 
-    // 3) Publica de golpe todos los comentarios
     await this.postComments(repo.owner.login, repo.name, pr.number, suggestions, patches);
   }
 
   private async collectPatches(owner: string, repo: string, pull_number: number): Promise<Patch[]> {
     const patches: Patch[] = [];
 
-    // Paginea sobre listFiles para obtener todos los parches
     for await (const { data: files } of this.octokit.paginate.iterator(this.octokit.pulls.listFiles, {
       owner,
       repo,
@@ -87,50 +83,49 @@ export class GitHubService {
     owner: string,
     repo: string,
     pull_number: number,
-    comments: CommentSuggestion[],
+    suggestions: CommentSuggestion[],
     patches: Patch[],
   ) {
-    // 1) Obtén en paralelo el SHA del PR y los comments ya existentes
+    // 1) Fetch PR data and existing review comments in parallel
     const [{ data: pr }, { data: existing }] = await Promise.all([
       this.octokit.rest.pulls.get({ owner, repo, pull_number }),
       this.octokit.rest.pulls.listReviewComments({ owner, repo, pull_number }),
     ]);
 
-    // 2) Usa un Set para filtrar duplicados en O(1)
+    // 2) Deduplicate with a Set for O(1) lookups
     const seen = new Set(existing.map((ec) => `${ec.path}|${ec.position}|${ec.body}`));
 
-    // 3) Mapea y filtra sólo las sugerencias nuevas y válidas
-    const reviewComments = comments.flatMap((c) => {
-      const patch = patches.find((p) => p.path === c.path && p.line === c.line);
+    // 3) Build the comments array for the review
+    const comments = suggestions.flatMap((s) => {
+      const patch = patches.find((p) => p.path === s.path && p.line === s.line);
       if (!patch) return [];
 
-      const key = `${c.path}|${patch.position}|${c.message}`;
+      const key = `${s.path}|${patch.position}|${s.message}`;
       if (seen.has(key)) return [];
       seen.add(key);
 
       return {
-        path: c.path,
+        path: s.path,
         position: patch.position,
-        body: c.message,
+        body: s.message,
       };
     });
 
-    if (reviewComments.length === 0) {
+    if (comments.length === 0) {
       console.log('[GitHub] No new comments to post.');
       return;
     }
 
-    // 4) Crea y publica la review con todos los comments en un solo request
-    //    event: 'COMMENT' envía y publica la review inmediatamente sin pasos extra :contentReference[oaicite:0]{index=0}
+    // 4) Create and publish a single review with all comments
     const { data: review } = await this.octokit.rest.pulls.createReview({
       owner,
       repo,
       pull_number,
       commit_id: pr.head.sha,
       event: 'COMMENT',
-      comments: reviewComments,
+      comments,
     });
 
-    console.log(`[GitHub] Published review #${review.id} with ${reviewComments.length} comments.`);
+    console.log(`[GitHub] Published review #${review.id} with ${comments.length} comments.`);
   }
 }

@@ -1,4 +1,4 @@
-# @octokit/webhooks npm package
+# @octokit/rest npm package
 
 > GitHub REST API client for JavaScript
 
