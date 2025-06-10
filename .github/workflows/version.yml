@@ -10,7 +10,7 @@ permissions:
   packages: write
 
 jobs:
-  version_and_publish:
+  version_and_release:
     runs-on: ubuntu-latest
 
     steps:
@@ -29,22 +29,12 @@ jobs:
       - name: Install standard-version
         run: npm install --save-dev standard-version
 
-      - name: Bump version with standard-version
+      - name: Bump version and create release
         id: bump_version
         run: |
           git config --global user.email "github-actions@github.com"
           git config --global user.name "github-actions"
-          npx standard-version
+          npx standard-version --release-as patch --releaseCommitMessageFormat "chore(release): {{currentTag}} [skip ci]" --no-verify
           git push --follow-tags origin main
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Create Release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: v${{ steps.bump_version.outputs.version }}
-          release_name: Release v${{ steps.bump_version.outputs.version }}
-          draft: false
-          prerelease: false
