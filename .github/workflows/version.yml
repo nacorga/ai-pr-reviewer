@@ -32,7 +32,6 @@ jobs:
         run: npm run build
 
       - name: Create Release
-        if: steps.check_changes.outputs.skip == 'false'
         uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
