@@ -1,13 +1,13 @@
 import { Octokit } from '@octokit/rest';
-import { OpenAIService } from './openai.service';
-import { GithubCommentSuggestion, GithubPatch, GithubPullRequestPayload } from '../types/github.types';
-import { GITHUB_COMMENT_IGNORE_FILE_PATTERNS, GITHUB_COMMENT_RATE_LIMIT_DELAY } from '../constants/config.constants';
+import { BaseService } from './base.service';
+import { BaseComment, BaseCommentSuggestion, BasePatch, BasePullRequestPayload } from '../types/base.types';
+import { GithubPullRequestPayload } from '../types/github.types';
 
-export class GitHubService {
+export class GitHubService extends BaseService<BasePullRequestPayload> {
   private octokit: Octokit;
-  private openaiSrv: OpenAIService;
 
   constructor() {
+    super('GITHUB');
     const token = process.env.GITHUB_TOKEN;
 
     if (!token) {
@@ -15,67 +15,39 @@ export class GitHubService {
     }
 
     this.octokit = new Octokit({ auth: token });
-    this.openaiSrv = new OpenAIService();
   }
 
   async handlePullRequest(payload: GithubPullRequestPayload): Promise<void> {
-    try {
-      const { action, pull_request: pr, repository: repo } = payload;
+    const basePayload: BasePullRequestPayload = {
+      action: payload.action,
+      pullRequest: {
+        id: payload.pull_request.number,
+        number: payload.pull_request.number,
+        head: {
+          sha: payload.pull_request.head.sha,
+        },
+      },
+      repository: {
+        owner: payload.repository.owner,
+        name: payload.repository.name,
+      },
+    };
 
-      if (!['opened', 'reopened', 'synchronize'].includes(action)) {
-        return;
-      }
-
-      console.log(`[GitHub] Processing PR #${pr.number} (${action})`);
-
-      try {
-        await this.octokit.rest.repos.getCollaboratorPermissionLevel({
-          owner: repo.owner.login,
-          repo: repo.name,
-          username: repo.owner.login,
-        });
-      } catch (error) {
-        console.error('[GitHub] Error checking permissions:', error);
-
-        throw new Error('Insufficient permissions to review pull requests');
-      }
-
-      const patches = await this.collectPatches(repo.owner.login, repo.name, pr.number);
-
-      if (patches.length === 0) {
-        console.log(`[GitHub] No changes in PR #${pr.number}`);
-
-        return;
-      }
-
-      console.log(`[GitHub] Reviewing ${patches.length} changed lines in PR #${pr.number}`);
-
-      const referenceContent = await this.getReferenceFiles(repo.owner.login, repo.name, pr.head.sha);
-
-      const suggestions = await this.openaiSrv.reviewPatches(
-        patches.map(({ path, line, content }) => ({ path, line, content })),
-        referenceContent,
-      );
-
-      await this.postComments(repo.owner.login, repo.name, pr.number, suggestions, patches, pr.head.sha);
-    } catch (error) {
-      console.error('[GitHub] Error processing pull request:', error);
-
-      throw error;
-    }
+    return this.processPullRequest(basePayload);
   }
 
-  private async collectPatches(owner: string, repo: string, pull_number: number): Promise<GithubPatch[]> {
+  protected async getPatches(payload: BasePullRequestPayload): Promise<BasePatch[]> {
     try {
-      const patches: GithubPatch[] = [];
+      const { repository: repo, pullRequest: pr } = payload;
+      const patches: BasePatch[] = [];
 
       for await (const { data: files } of this.octokit.paginate.iterator(this.octokit.pulls.listFiles, {
-        owner,
-        repo,
-        pull_number,
+        owner: repo.owner.login,
+        repo: repo.name,
+        pull_number: pr.number!,
       })) {
         for (const file of files) {
-          if (!file.patch || GITHUB_COMMENT_IGNORE_FILE_PATTERNS.some((rx) => rx.test(file.filename))) {
+          if (!file.patch || this.isFileIgnored(file.filename)) {
             continue;
           }
 
@@ -87,13 +59,10 @@ export class GitHubService {
           for (const l of lines) {
             if (l.startsWith('@@')) {
               const m = /@@ -\d+,?\d* \+(\d+),?\d* @@/.exec(l);
-
               if (m) {
                 currentLine = parseInt(m[1], 10);
               }
-
               currentDiffHunk = l;
-
               continue;
             }
 
@@ -115,20 +84,21 @@ export class GitHubService {
       return patches;
     } catch (error) {
       console.error('[GitHub] Error collecting patches:', error);
-
       throw error;
     }
   }
 
-  private async getReferenceFiles(owner: string, repo: string, ref: string): Promise<string> {
+  protected async getReferenceFiles(payload: BasePullRequestPayload): Promise<string> {
+    const { repository: repo, pullRequest: pr } = payload;
+
     let referenceContent = '';
 
     try {
       const { data: dirContents } = await this.octokit.rest.repos.getContent({
-        owner,
-        repo,
+        owner: repo.owner.login,
+        repo: repo.name,
         path: '.pr-guidelines',
-        ref,
+        ref: pr.head.sha,
       });
 
       if (!Array.isArray(dirContents)) {
@@ -145,10 +115,10 @@ export class GitHubService {
 
       for (const file of mdFiles) {
         const { data: fileContent } = await this.octokit.rest.repos.getContent({
-          owner,
-          repo,
+          owner: repo.owner.login,
+          repo: repo.name,
           path: file.path,
-          ref,
+          ref: pr.head.sha,
         });
 
         if ('content' in fileContent) {
@@ -166,46 +136,42 @@ export class GitHubService {
     return referenceContent;
   }
 
-  private async postComments(
-    owner: string,
-    repo: string,
-    pull_number: number,
-    suggestions: GithubCommentSuggestion[],
-    patches: GithubPatch[],
-    pr_head_sha: string,
+  protected async postComments(
+    payload: BasePullRequestPayload,
+    suggestions: BaseCommentSuggestion[],
+    patches: BasePatch[],
   ): Promise<void> {
     try {
-      const comments = await this.getComments(owner, repo, pull_number, suggestions, patches);
+      const { repository: repo, pullRequest: pr } = payload;
+      const comments = await this.getComments(payload, suggestions, patches);
 
       if (comments.length === 0) {
         return;
       }
 
       for (const comment of comments) {
-        if (!comment.path || !comment.line || !comment.body || !pr_head_sha) {
+        if (!comment.path || !comment.line || !comment.content || !pr.head.sha) {
           console.error('[GitHub] Missing required parameters for comment:', comment);
 
           continue;
         }
 
         const params = {
-          owner,
-          repo,
-          pull_number,
-          commit_id: pr_head_sha,
+          owner: repo.owner.login,
+          repo: repo.name,
+          pull_number: pr.number!,
+          commit_id: pr.head.sha,
           path: comment.path,
           line: comment.line,
-          side: comment.side,
-          body: comment.body,
-          ...(comment.start_line && { start_line: comment.start_line }),
-          ...(comment.start_side && { start_side: comment.start_side }),
+          side: 'RIGHT' as const,
+          body: comment.content,
         };
 
         console.log(`[GitHub] Posting comment: ${JSON.stringify(params)}`);
 
         try {
           await this.octokit.rest.pulls.createReviewComment(params);
-          await new Promise((resolve) => setTimeout(resolve, GITHUB_COMMENT_RATE_LIMIT_DELAY));
+          await this.delay();
         } catch (error) {
           console.error('[GitHub] Error posting individual comment:', error);
 
@@ -221,26 +187,16 @@ export class GitHubService {
     }
   }
 
-  private async getComments(
-    owner: string,
-    repo: string,
-    pull_number: number,
-    suggestions: GithubCommentSuggestion[],
-    patches: GithubPatch[],
-  ): Promise<
-    Array<{
-      path: string;
-      line: number;
-      side: 'RIGHT';
-      body: string;
-      start_line?: number;
-      start_side?: 'RIGHT';
-    }>
-  > {
+  protected async getComments(
+    payload: BasePullRequestPayload,
+    suggestions: BaseCommentSuggestion[],
+    patches: BasePatch[],
+  ): Promise<BaseComment[]> {
+    const { repository: repo, pullRequest: pr } = payload;
     const existingComments = await this.octokit.paginate(this.octokit.rest.pulls.listReviewComments, {
-      owner,
-      repo,
-      pull_number,
+      owner: repo.owner.login,
+      repo: repo.name,
+      pull_number: pr.number!,
       per_page: 100,
     });
 
@@ -263,12 +219,11 @@ export class GitHubService {
         return {
           path: s.path,
           line: patch.line,
-          side: 'RIGHT' as const,
-          body: s.message,
+          content: s.message,
         };
       })
       .filter((comment): comment is NonNullable<typeof comment> => comment !== null);
 
-    return comments || [];
+    return comments;
   }
 }

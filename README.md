@@ -1,20 +1,21 @@
 # AI PR Reviewer
 
-An automated bot that reviews GitHub Pull Requests using OpenAI to provide comments and improvement suggestions.
+An automated bot that reviews GitHub and Bitbucket Pull Requests using OpenAI to provide comments and improvement suggestions.
 
 ## Features
 
 - Automatic Pull Request review
 - Code analysis using OpenAI API
 - Detailed comments on modified files
-- GitHub integration via webhooks
+- GitHub and Bitbucket integration via webhooks
 - Support for PR events: opening, reopening, and synchronization
 - Custom review guidelines via `.pr-guidelines` folder
 - Smart context management for large codebases
+- Secure webhook handling with signature verification
 
 ## Purpose
 
-This application was developed to automate the code review process in GitHub repositories. It helps development teams by:
+This application was developed to automate the code review process in GitHub and Bitbucket repositories. It helps development teams by:
 
 - Reducing time spent on manual code reviews
 - Providing consistent and objective feedback
@@ -24,8 +25,10 @@ This application was developed to automate the code review process in GitHub rep
 ## Requirements
 
 - Node.js
-- GitHub account with personal access token
 - OpenAI account with API key
+- At least one of:
+  - GitHub account with personal access token
+  - Bitbucket account with app password
 
 ## Setup
 
@@ -47,23 +50,51 @@ touch .env
 ```
 
 Add the following environment variables to your `.env` file:
-```
-# Required: Your GitHub webhook secret for verifying webhook payloads
-GITHUB_WEBHOOK_SECRET=your_webhook_secret
 
-# Required: Your GitHub personal access token with repo scope
+```
+# Required for all providers
+OPENAI_API_KEY=your_openai_api_key
+
+# Required for GitHub integration
+WEBHOOK_SECRET=your_webhook_secret
 GITHUB_TOKEN=your_github_token
 
-# Required: Your OpenAI API key for code analysis
-OPENAI_API_KEY=your_openai_api_key
+# Required for Bitbucket integration
+BITBUCKET_USERNAME=your_bitbucket_username
+BITBUCKET_APP_PASSWORD=your_bitbucket_app_password
+BITBUCKET_WORKSPACE=your_bitbucket_workspace
+
+# Optional: Server port (defaults to 3000)
+PORT=3000
 ```
 
-4. Configure the webhook in your GitHub repository:
-   - Go to Settings > Webhooks
-   - Add a new webhook
-   - URL: `https://your-domain.com/webhooks`
-   - Content type: `application/json`
-   - Events: Select "Pull request"
+Note: You only need to configure the variables for the provider(s) you plan to use. At least one provider (GitHub or Bitbucket) must be configured.
+
+4. Configure the webhooks:
+
+### GitHub
+- Go to your repository Settings > Webhooks
+- Add a new webhook
+- URL: `https://your-domain.com/webhooks/github`
+- Content type: `application/json`
+- Secret: Use the same value as `WEBHOOK_SECRET`
+- Events: Select "Pull request"
+
+### Bitbucket
+- Go to your repository Settings > Webhooks
+- Add a new webhook
+- URL: `https://your-domain.com/webhooks/bitbucket`
+- Secret: Use the same value as `WEBHOOK_SECRET`
+- Triggers: Select "Pull Request" events (Created, Updated, Merged)
+
+## Security
+
+The application implements webhook signature verification for both GitHub and Bitbucket:
+
+- GitHub: Uses HMAC-SHA1 for signature verification
+- Bitbucket: Uses HMAC-SHA256 for signature verification
+
+Both providers use the same webhook secret (WEBHOOK_SECRET) for simplicity, but you can use different secrets if needed.
 
 ## Custom Guidelines
 
@@ -90,7 +121,7 @@ The bot will automatically trigger when:
 # Build the project
 npm run build
 
-# Start the project
+# Start the server
 npm run start
 ```
 
