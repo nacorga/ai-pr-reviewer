@@ -2,6 +2,7 @@ import { Webhooks, createNodeMiddleware } from '@octokit/webhooks';
 import { createServer, IncomingMessage, ServerResponse } from 'node:http';
 import * as dotenv from 'dotenv';
 import { GitHubService } from './services/github.service';
+import { GithubPullRequestPayload } from './types/github.types';
 
 dotenv.config();
 
@@ -23,7 +24,7 @@ const githubSrv = new GitHubService();
 
 webhooks.on('pull_request', async ({ payload }) => {
   try {
-    await githubSrv.handlePullRequest(payload as any);
+    await githubSrv.handlePullRequest(payload as GithubPullRequestPayload);
     console.log(
       `[PR Review] Successfully processed PR #${payload.pull_request.number} in ${payload.repository.full_name} (${payload.action})`,
     );
