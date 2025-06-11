@@ -104,4 +104,4 @@ This tool sends code changes to the OpenAI API for analysis. Review your privacy
 
 ## License
 
-MIT 
+MIT
