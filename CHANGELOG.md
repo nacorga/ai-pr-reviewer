@@ -1,6 +1,24 @@
 # 📦 Changelog
 
 All notable changes to this project will be documented in this file.
+### [1.0.1](https://github.com/nacorga/ai-pr-reviewer/compare/v1.0.0...v1.0.1) (2025-06-11)
+
+
+### Features
+
+* add configuration constants for GitHub comment rate limiting and file pattern ignoring ([6eb94cb](https://github.com/nacorga/ai-pr-reviewer/commit/6eb94cb01910549693f01e2df3e34abe1ce9a15f))
+* add diffHunk property to Patch interface and GitHubService for improved patch tracking ([2029427](https://github.com/nacorga/ai-pr-reviewer/commit/2029427f33df365c9080885e528752f45acf21b3))
+* add PR review prompt constant and refactor OpenAI service to use it ([b39b815](https://github.com/nacorga/ai-pr-reviewer/commit/b39b81589f363618771ccaab4cd3cb56b9459755))
+* chunk patches before openai call ([520d341](https://github.com/nacorga/ai-pr-reviewer/commit/520d341968104b28c0e1e99c99b41564c8b8e92b))
+
+
+### Bug Fixes
+
+* correct line numbers in collectPatches ([e0e60c9](https://github.com/nacorga/ai-pr-reviewer/commit/e0e60c9c0893c2038654d9e53d43bde3435ec98f))
+* improve validation for review comments by checking patch position ([9cf3036](https://github.com/nacorga/ai-pr-reviewer/commit/9cf30369d5fd59230373c160fdf6931a3725cc5c))
+* update review comment creation to use line instead of position and prevent duplicates ([c507e6e](https://github.com/nacorga/ai-pr-reviewer/commit/c507e6e52cc343ca512b1d1d25c5541f61af1b4a))
+* use line-based comments ([c580837](https://github.com/nacorga/ai-pr-reviewer/commit/c580837f6eb3b15456a17c4f3096c4777461fb3d))
+
 ## 1.0.0 (2025-06-10)
 
 
