@@ -169,10 +169,8 @@ export class GitHubService {
   ): Promise<
     Array<{
       path: string;
-      line: number;
-      side: 'RIGHT';
+      position: number;
       body: string;
-      diff_hunk: string;
     }>
   > {
     const { data: existingComments } = await this.octokit.rest.pulls.listReviewComments({
@@ -190,7 +188,7 @@ export class GitHubService {
         }
 
         const isDuplicate = existingComments.some(
-          (comment) => comment.path === s.path && comment.line === patch.line && comment.body === s.message,
+          (comment) => comment.path === s.path && comment.position === patch.position && comment.body === s.message,
         );
 
         if (isDuplicate) {
@@ -199,10 +197,8 @@ export class GitHubService {
 
         return {
           path: s.path,
-          line: patch.line,
-          side: 'RIGHT' as const,
+          position: patch.position,
           body: s.message,
-          diff_hunk: patch.diffHunk,
         };
       })
       .filter((comment): comment is NonNullable<typeof comment> => comment !== null);
