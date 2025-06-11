@@ -3,6 +3,7 @@ import { PR_REVIEW_PROMPT } from '../constants/prompt.constants';
 import { OPENAI_CONFIG } from '../constants/openai.constants';
 import { OpenAIPatch, OpenAIReview, OpenAIReviewResponse } from '../types/openai.types';
 import { ChunkManagerUtil } from '../utils/chunk-manager.util';
+import { tryParseJson } from '../utils/json.util';
 
 class OpenAIError extends Error {
   constructor(
@@ -66,18 +67,22 @@ export class OpenAIService {
       max_tokens: OPENAI_CONFIG.maxTokens,
     });
 
+    if (!response.choices || response.choices.length === 0) {
+      throw new OpenAIError('Invalid OpenAI response: no choices returned');
+    }
+
     const content = response.choices[0].message.content;
 
     if (!content) {
       return [];
     }
 
-    try {
-      const parsed = JSON.parse(content) as OpenAIReviewResponse;
+    const parsed = tryParseJson<OpenAIReviewResponse>(content);
 
-      return parsed.reviews || [];
-    } catch (error) {
-      throw new OpenAIError('Failed to parse review response', error);
+    if (!parsed) {
+      throw new OpenAIError('Failed to parse review response');
     }
+
+    return parsed.reviews || [];
   }
 }

@@ -26,6 +26,14 @@ export class ChunkManagerUtil {
   }
 
   static splitReferenceContent(content: string, maxSize: number): string[] {
+    if (typeof content !== 'string') {
+      throw new Error('Content must be a string');
+    }
+
+    if (maxSize <= 0) {
+      throw new Error('Max size must be greater than 0');
+    }
+
     if (content.length <= maxSize) {
       return [content];
     }

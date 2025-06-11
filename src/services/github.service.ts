@@ -135,6 +135,12 @@ export class GitHubService {
         return referenceContent;
       }
 
+      if (!dirContents.every((entry) => entry && typeof entry === 'object' && 'type' in entry && 'name' in entry)) {
+        console.warn('[GitHub] Unexpected directory contents structure:', dirContents);
+
+        return referenceContent;
+      }
+
       const mdFiles = dirContents.filter((file) => file.type === 'file' && file.name.endsWith('.md'));
 
       for (const file of mdFiles) {
@@ -151,8 +157,10 @@ export class GitHubService {
           referenceContent += `\nReferencia de ${file.name}:\n${content}\n`;
         }
       }
-    } catch (error) {
-      console.warn('[GitHub] Could not read reference files:', error);
+    } catch (error: any) {
+      const codeInfo = error?.code ? `${error.code} - ` : '';
+
+      console.warn(`[GitHub] Could not read reference files: ${codeInfo}${error?.message}`);
     }
 
     return referenceContent;
