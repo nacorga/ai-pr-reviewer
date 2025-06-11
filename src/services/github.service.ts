@@ -80,26 +80,30 @@ export class GitHubService {
 
           let currentLine = 0;
           let position = 0;
-          let diffHunk = '';
+          let currentDiffHunk = '';
 
           for (const l of lines) {
             if (l.startsWith('@@')) {
               const m = /@@ -\d+,?\d* \+(\d+),?\d* @@/.exec(l);
+
               if (m) {
                 currentLine = parseInt(m[1], 10);
               }
-              diffHunk = l;
+
+              currentDiffHunk = l;
+
               continue;
             }
 
             position++;
+
             if (l.startsWith('+')) {
               patches.push({
                 path: file.filename,
                 line: currentLine,
                 position,
                 content: l.slice(1),
-                diffHunk,
+                diffHunk: currentDiffHunk,
               });
               currentLine++;
             } else if (!l.startsWith('-')) {
@@ -139,7 +143,7 @@ export class GitHubService {
             line: patch.line,
             side: 'RIGHT' as const,
             body: s.message,
-            diffHunk: patch.diffHunk,
+            diff_hunk: patch.diffHunk,
           };
         })
         .filter((comment): comment is NonNullable<typeof comment> => comment !== null);
