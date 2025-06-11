@@ -1,7 +1,6 @@
 export interface GithubPatch {
   path: string;
   line: number;
-  position: number;
   content: string;
   diffHunk: string;
 }

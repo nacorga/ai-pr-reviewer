@@ -82,7 +82,6 @@ export class GitHubService {
           const lines = file.patch.split('\n');
 
           let currentLine = 0;
-          let position = 0;
           let currentDiffHunk = '';
 
           for (const l of lines) {
@@ -98,13 +97,10 @@ export class GitHubService {
               continue;
             }
 
-            position++;
-
             if (l.startsWith('+')) {
               patches.push({
                 path: file.filename,
                 line: currentLine,
-                position,
                 content: l.slice(1),
                 diffHunk: currentDiffHunk,
               });

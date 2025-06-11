@@ -23,14 +23,14 @@ export class OpenAIService {
 
   async reviewPatches(patches: OpenAIPatch[], referenceContent: string = ''): Promise<OpenAIReview[]> {
     const patchChunks = ChunkManagerUtil.splitIntoChunks(patches, OPENAI_CONFIG.maxPatchChars, JSON.stringify);
-
     const referenceChunks = ChunkManagerUtil.splitReferenceContent(referenceContent, OPENAI_CONFIG.maxReferenceChars);
-
     const allReviews: OpenAIReview[] = [];
+    const mergedReferences = referenceChunks.join('\n');
 
-    for (const chunk of patchChunks) {
+    for (let i = 0; i < patchChunks.length; i++) {
       try {
-        const reviews = await this.reviewChunk(chunk, referenceChunks[0] || '');
+        const reference = referenceChunks.length === patchChunks.length ? referenceChunks[i] : mergedReferences;
+        const reviews = await this.reviewChunk(patchChunks[i], reference || '');
 
         allReviews.push(...reviews);
       } catch (error) {
