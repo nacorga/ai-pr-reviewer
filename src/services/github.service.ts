@@ -233,10 +233,11 @@ export class GitHubService {
       start_side?: 'RIGHT';
     }>
   > {
-    const { data: existingComments } = await this.octokit.rest.pulls.listReviewComments({
+    const existingComments = await this.octokit.paginate(this.octokit.rest.pulls.listReviewComments, {
       owner,
       repo,
       pull_number,
+      per_page: 100,
     });
 
     const comments = suggestions
