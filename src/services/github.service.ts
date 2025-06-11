@@ -20,17 +20,20 @@ export class GitHubService {
 
   async handlePullRequest(payload: any) {
     const { action, pull_request: pr, repository: repo } = payload;
+
     if (!['opened', 'reopened', 'synchronize'].includes(action)) return;
 
     console.log(`[GitHub] Processing PR #${pr.number} (${action})`);
 
     const patches = await this.collectPatches(repo.owner.login, repo.name, pr.number);
+
     if (patches.length === 0) {
       console.log(`[GitHub] No changes in PR #${pr.number}`);
       return;
     }
 
     console.log(`[GitHub] Reviewing ${patches.length} changed lines in PR #${pr.number}`);
+
     const suggestions = await this.openai.reviewPatches(
       patches.map(({ path, line, content }) => ({ path, line, content })),
     );
@@ -47,15 +50,21 @@ export class GitHubService {
       pull_number,
     })) {
       for (const file of files) {
-        if (!file.patch) continue;
+        const ignoreGlobs = [/-lock\.json$/, /\.md$/];
+
+        if (!file.patch || ignoreGlobs.some((rx) => rx.test(file.filename))) {
+          continue;
+        }
 
         const lines = file.patch.split('\n');
+
         let currentLine = 0;
         let position = 0;
 
         for (const l of lines) {
           if (l.startsWith('@@')) {
             const m = /@@ -\d+,?\d* \+(\d+),?\d* @@/.exec(l);
+
             if (m) currentLine = parseInt(m[1], 10);
             continue;
           }
@@ -86,22 +95,24 @@ export class GitHubService {
     suggestions: CommentSuggestion[],
     patches: Patch[],
   ) {
-    // 1) Fetch PR data and existing review comments in parallel
     const [{ data: pr }, { data: existing }] = await Promise.all([
       this.octokit.rest.pulls.get({ owner, repo, pull_number }),
       this.octokit.rest.pulls.listReviewComments({ owner, repo, pull_number }),
     ]);
 
-    // 2) Deduplicate with a Set for O(1) lookups
     const seen = new Set(existing.map((ec) => `${ec.path}|${ec.position}|${ec.body}`));
 
-    // 3) Build the comments array for the review
     const comments = suggestions.flatMap((s) => {
       const patch = patches.find((p) => p.path === s.path && p.line === s.line);
+
       if (!patch) return [];
 
       const key = `${s.path}|${patch.position}|${s.message}`;
-      if (seen.has(key)) return [];
+
+      if (seen.has(key)) {
+        return [];
+      }
+
       seen.add(key);
 
       return {
@@ -113,10 +124,10 @@ export class GitHubService {
 
     if (comments.length === 0) {
       console.log('[GitHub] No new comments to post.');
+
       return;
     }
 
-    // 4) Create and publish a single review with all comments
     const { data: review } = await this.octokit.rest.pulls.createReview({
       owner,
       repo,
