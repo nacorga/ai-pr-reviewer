@@ -1,6 +1,14 @@
 # 📦 Changelog
 
 All notable changes to this project will be documented in this file.
+### [1.0.2](https://github.com/nacorga/ai-pr-reviewer/compare/v1.0.1...v1.0.2) (2025-06-11)
+
+
+### Bug Fixes
+
+* add parameter validation and error handling for GitHub comments in GitHubService ([e8ba3fe](https://github.com/nacorga/ai-pr-reviewer/commit/e8ba3fe812d7f08a6127b17630902d6f1513b4ed))
+* update line number to position in GitHubService for improved comment handling ([927cb5f](https://github.com/nacorga/ai-pr-reviewer/commit/927cb5fda978475eb53a3d7581a8de1f4689239c))
+
 ### [1.0.1](https://github.com/nacorga/ai-pr-reviewer/compare/v1.0.0...v1.0.1) (2025-06-11)
 
 
