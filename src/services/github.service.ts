@@ -130,23 +130,7 @@ export class GitHubService {
     pr_head_sha: string,
   ): Promise<void> {
     try {
-      const comments = suggestions
-        .map((s) => {
-          const patch = patches.find((p) => p.path === s.path && p.line === s.line);
-
-          if (!patch) {
-            return null;
-          }
-
-          return {
-            path: s.path,
-            line: patch.line,
-            side: 'RIGHT' as const,
-            body: s.message,
-            diff_hunk: patch.diffHunk,
-          };
-        })
-        .filter((comment): comment is NonNullable<typeof comment> => comment !== null);
+      const comments = await this.getComments(owner, repo, pull_number, suggestions, patches);
 
       if (comments.length === 0) {
         return;
@@ -174,5 +158,55 @@ export class GitHubService {
 
       throw error;
     }
+  }
+
+  private async getComments(
+    owner: string,
+    repo: string,
+    pull_number: number,
+    suggestions: CommentSuggestion[],
+    patches: Patch[],
+  ): Promise<
+    Array<{
+      path: string;
+      line: number;
+      side: 'RIGHT';
+      body: string;
+      diff_hunk: string;
+    }>
+  > {
+    const { data: existingComments } = await this.octokit.rest.pulls.listReviewComments({
+      owner,
+      repo,
+      pull_number,
+    });
+
+    const comments = suggestions
+      .map((s) => {
+        const patch = patches.find((p) => p.path === s.path && p.line === s.line);
+
+        if (!patch) {
+          return null;
+        }
+
+        const isDuplicate = existingComments.some(
+          (comment) => comment.path === s.path && comment.line === patch.line && comment.body === s.message,
+        );
+
+        if (isDuplicate) {
+          return null;
+        }
+
+        return {
+          path: s.path,
+          line: patch.line,
+          side: 'RIGHT' as const,
+          body: s.message,
+          diff_hunk: patch.diffHunk,
+        };
+      })
+      .filter((comment): comment is NonNullable<typeof comment> => comment !== null);
+
+    return comments || [];
   }
 }
