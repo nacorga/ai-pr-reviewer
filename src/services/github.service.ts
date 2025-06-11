@@ -44,6 +44,7 @@ export class GitHubService {
 
       if (patches.length === 0) {
         console.log(`[GitHub] No changes in PR #${pr.number}`);
+
         return;
       }
 
@@ -79,26 +80,26 @@ export class GitHubService {
 
           let currentLine = 0;
           let position = 0;
+          let diffHunk = '';
 
           for (const l of lines) {
             if (l.startsWith('@@')) {
               const m = /@@ -\d+,?\d* \+(\d+),?\d* @@/.exec(l);
-
               if (m) {
                 currentLine = parseInt(m[1], 10);
               }
-
+              diffHunk = l;
               continue;
             }
 
             position++;
-
             if (l.startsWith('+')) {
               patches.push({
                 path: file.filename,
                 line: currentLine,
                 position,
                 content: l.slice(1),
+                diffHunk,
               });
               currentLine++;
             } else if (!l.startsWith('-')) {
@@ -138,6 +139,7 @@ export class GitHubService {
             line: patch.line,
             side: 'RIGHT' as const,
             body: s.message,
+            diffHunk: patch.diffHunk,
           };
         })
         .filter((comment): comment is NonNullable<typeof comment> => comment !== null);

@@ -3,6 +3,7 @@ export interface Patch {
   line: number;
   position: number;
   content: string;
+  diffHunk: string;
 }
 
 export interface CommentSuggestion {
