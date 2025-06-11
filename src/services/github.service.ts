@@ -137,19 +137,35 @@ export class GitHubService {
       }
 
       for (const comment of comments) {
+        if (!comment.path || !comment.line || !comment.body || !pr_head_sha) {
+          console.error('[GitHub] Missing required parameters for comment:', comment);
+
+          continue;
+        }
+
         const params = {
           owner,
           repo,
           pull_number,
           commit_id: pr_head_sha,
-          ...comment,
+          path: comment.path,
+          line: comment.line,
+          side: comment.side,
+          body: comment.body,
+          ...(comment.start_line && { start_line: comment.start_line }),
+          ...(comment.start_side && { start_side: comment.start_side }),
         };
 
         console.log(`[GitHub] Posting comment: ${JSON.stringify(params)}`);
 
-        await this.octokit.rest.pulls.createReviewComment(params);
+        try {
+          await this.octokit.rest.pulls.createReviewComment(params);
+          await new Promise((resolve) => setTimeout(resolve, GITHUB_COMMENT_RATE_LIMIT_DELAY));
+        } catch (error) {
+          console.error('[GitHub] Error posting individual comment:', error);
 
-        await new Promise((resolve) => setTimeout(resolve, GITHUB_COMMENT_RATE_LIMIT_DELAY));
+          continue;
+        }
       }
 
       console.log(`[GitHub] Published ${comments.length} comments.`);
@@ -169,8 +185,11 @@ export class GitHubService {
   ): Promise<
     Array<{
       path: string;
-      position: number;
+      line: number;
+      side: 'RIGHT';
       body: string;
+      start_line?: number;
+      start_side?: 'RIGHT';
     }>
   > {
     const { data: existingComments } = await this.octokit.rest.pulls.listReviewComments({
@@ -188,7 +207,7 @@ export class GitHubService {
         }
 
         const isDuplicate = existingComments.some(
-          (comment) => comment.path === s.path && comment.position === patch.position && comment.body === s.message,
+          (comment) => comment.path === s.path && comment.line === patch.line && comment.body === s.message,
         );
 
         if (isDuplicate) {
@@ -197,7 +216,8 @@ export class GitHubService {
 
         return {
           path: s.path,
-          position: patch.position,
+          line: patch.line,
+          side: 'RIGHT' as const,
           body: s.message,
         };
       })
