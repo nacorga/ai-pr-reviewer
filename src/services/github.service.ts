@@ -1,6 +1,6 @@
 import { Octokit } from '@octokit/rest';
 import { OpenAIService } from './openai.service';
-import { CommentSuggestion, Patch, PullRequestPayload } from '../types/github.types';
+import { GithubCommentSuggestion, GithubPatch, GithubPullRequestPayload } from '../types/github.types';
 import { GITHUB_COMMENT_IGNORE_FILE_PATTERNS, GITHUB_COMMENT_RATE_LIMIT_DELAY } from '../constants/config.constants';
 
 export class GitHubService {
@@ -18,7 +18,7 @@ export class GitHubService {
     this.openaiSrv = new OpenAIService();
   }
 
-  async handlePullRequest(payload: PullRequestPayload): Promise<void> {
+  async handlePullRequest(payload: GithubPullRequestPayload): Promise<void> {
     try {
       const { action, pull_request: pr, repository: repo } = payload;
 
@@ -50,8 +50,11 @@ export class GitHubService {
 
       console.log(`[GitHub] Reviewing ${patches.length} changed lines in PR #${pr.number}`);
 
+      const referenceContent = await this.getReferenceFiles(repo.owner.login, repo.name, pr.head.sha);
+
       const suggestions = await this.openaiSrv.reviewPatches(
         patches.map(({ path, line, content }) => ({ path, line, content })),
+        referenceContent,
       );
 
       await this.postComments(repo.owner.login, repo.name, pr.number, suggestions, patches, pr.head.sha);
@@ -62,9 +65,9 @@ export class GitHubService {
     }
   }
 
-  private async collectPatches(owner: string, repo: string, pull_number: number): Promise<Patch[]> {
+  private async collectPatches(owner: string, repo: string, pull_number: number): Promise<GithubPatch[]> {
     try {
-      const patches: Patch[] = [];
+      const patches: GithubPatch[] = [];
 
       for await (const { data: files } of this.octokit.paginate.iterator(this.octokit.pulls.listFiles, {
         owner,
@@ -121,12 +124,50 @@ export class GitHubService {
     }
   }
 
+  private async getReferenceFiles(owner: string, repo: string, ref: string): Promise<string> {
+    let referenceContent = '';
+
+    try {
+      const { data: dirContents } = await this.octokit.rest.repos.getContent({
+        owner,
+        repo,
+        path: '.pr-guidelines',
+        ref,
+      });
+
+      if (!Array.isArray(dirContents)) {
+        return referenceContent;
+      }
+
+      const mdFiles = dirContents.filter((file) => file.type === 'file' && file.name.endsWith('.md'));
+
+      for (const file of mdFiles) {
+        const { data: fileContent } = await this.octokit.rest.repos.getContent({
+          owner,
+          repo,
+          path: file.path,
+          ref,
+        });
+
+        if ('content' in fileContent) {
+          const content = Buffer.from(fileContent.content, 'base64').toString('utf-8');
+
+          referenceContent += `\nReferencia de ${file.name}:\n${content}\n`;
+        }
+      }
+    } catch (error) {
+      console.warn('[GitHub] Could not read reference files:', error);
+    }
+
+    return referenceContent;
+  }
+
   private async postComments(
     owner: string,
     repo: string,
     pull_number: number,
-    suggestions: CommentSuggestion[],
-    patches: Patch[],
+    suggestions: GithubCommentSuggestion[],
+    patches: GithubPatch[],
     pr_head_sha: string,
   ): Promise<void> {
     try {
@@ -180,8 +221,8 @@ export class GitHubService {
     owner: string,
     repo: string,
     pull_number: number,
-    suggestions: CommentSuggestion[],
-    patches: Patch[],
+    suggestions: GithubCommentSuggestion[],
+    patches: GithubPatch[],
   ): Promise<
     Array<{
       path: string;

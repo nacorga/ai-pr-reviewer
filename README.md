@@ -9,6 +9,8 @@ An automated bot that reviews GitHub Pull Requests using OpenAI to provide comme
 - Detailed comments on modified files
 - GitHub integration via webhooks
 - Support for PR events: opening, reopening, and synchronization
+- Custom review guidelines via `.pr-guidelines` folder
+- Smart context management for large codebases
 
 ## Purpose
 
@@ -62,6 +64,18 @@ OPENAI_API_KEY=your_openai_api_key
    - URL: `https://your-domain.com/webhooks`
    - Content type: `application/json`
    - Events: Select "Pull request"
+
+## Custom Guidelines
+
+Add a `.pr-guidelines` folder to your repository with `.md` files containing your review guidelines. The bot will use these as context for reviews.
+
+```
+your-repo/
+  ├── .pr-guidelines/
+  │   ├── code-style.md
+  │   └── best-practices.md
+  └── ...
+```
 
 ## Usage
 

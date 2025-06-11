@@ -1,4 +1,4 @@
-export interface Patch {
+export interface GithubPatch {
   path: string;
   line: number;
   position: number;
@@ -6,13 +6,13 @@ export interface Patch {
   diffHunk: string;
 }
 
-export interface CommentSuggestion {
+export interface GithubCommentSuggestion {
   path: string;
   line: number;
   message: string;
 }
 
-export interface PullRequestPayload {
+export interface GithubPullRequestPayload {
   action: string;
   pull_request: {
     number: number;

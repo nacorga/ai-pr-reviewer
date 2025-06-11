@@ -1,61 +1,83 @@
 import OpenAI from 'openai';
 import { PR_REVIEW_PROMPT } from '../constants/prompt.constants';
+import { OPENAI_CONFIG } from '../constants/openai.constants';
+import { OpenAIPatch, OpenAIReview, OpenAIReviewResponse } from '../types/openai.types';
+import { ChunkManagerUtil } from '../utils/chunk-manager.util';
 
-const MAX_PATCH_CHARS = 10000;
+class OpenAIError extends Error {
+  constructor(
+    message: string,
+    public readonly originalError?: any,
+  ) {
+    super(message);
+    this.name = 'OpenAIError';
+  }
+}
 
 export class OpenAIService {
-  private client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY as string });
+  private client: OpenAI;
 
-  async reviewPatches(
-    patches: Array<{ path: string; line: number; content: string }>,
-  ): Promise<Array<{ path: string; line: number; message: string }>> {
-    const chunks: Array<Array<{ path: string; line: number; content: string }>> = [];
+  constructor() {
+    this.client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  }
 
-    let current: Array<{ path: string; line: number; content: string }> = [];
-    let length = 0;
+  async reviewPatches(patches: OpenAIPatch[], referenceContent: string = ''): Promise<OpenAIReview[]> {
+    const patchChunks = ChunkManagerUtil.splitIntoChunks(patches, OPENAI_CONFIG.maxPatchChars, JSON.stringify);
 
-    for (const p of patches) {
-      const str = JSON.stringify(p);
+    const referenceChunks = ChunkManagerUtil.splitReferenceContent(referenceContent, OPENAI_CONFIG.maxReferenceChars);
 
-      if (length + str.length > MAX_PATCH_CHARS && current.length) {
-        chunks.push(current);
-        current = [p];
-        length = str.length;
-      } else {
-        current.push(p);
-        length += str.length;
-      }
-    }
+    const allReviews: OpenAIReview[] = [];
 
-    if (current.length) chunks.push(current);
-
-    const allReviews: Array<{ path: string; line: number; message: string }> = [];
-
-    for (const chunk of chunks) {
-      const prompt = PR_REVIEW_PROMPT(chunk);
-
-      const resp = await this.client.chat.completions.create({
-        model: 'gpt-4o-mini',
-        messages: [{ role: 'user', content: prompt }],
-        temperature: 0,
-        response_format: { type: 'json_object' },
-      });
-
+    for (const chunk of patchChunks) {
       try {
-        const content = resp.choices[0].message.content;
+        const reviews = await this.reviewChunk(chunk, referenceChunks[0] || '');
 
-        if (!content) continue;
-
-        const parsed = JSON.parse(content);
-
-        allReviews.push(...(parsed.reviews || []));
-      } catch (error: any) {
-        console.error('[OpenAI] Failed to parse review response:', error.message);
-
-        continue;
+        allReviews.push(...reviews);
+      } catch (error) {
+        console.error('[OpenAI] Error reviewing chunk:', error);
       }
     }
 
     return allReviews;
+  }
+
+  private async reviewChunk(chunk: OpenAIPatch[], referenceContent: string): Promise<OpenAIReview[]> {
+    try {
+      return await this.makeReviewRequest(chunk, referenceContent);
+    } catch (error: any) {
+      if (error.message?.includes('maximum context length')) {
+        console.warn('[OpenAI] Prompt too long, retrying without references...');
+
+        return await this.makeReviewRequest(chunk);
+      }
+
+      throw new OpenAIError('Failed to review chunk', error);
+    }
+  }
+
+  private async makeReviewRequest(chunk: OpenAIPatch[], referenceContent?: string): Promise<OpenAIReview[]> {
+    const prompt = PR_REVIEW_PROMPT(chunk, referenceContent || '');
+
+    const response = await this.client.chat.completions.create({
+      model: OPENAI_CONFIG.model,
+      messages: [{ role: 'user', content: prompt }],
+      temperature: OPENAI_CONFIG.temperature,
+      response_format: { type: 'json_object' },
+      max_tokens: OPENAI_CONFIG.maxTokens,
+    });
+
+    const content = response.choices[0].message.content;
+
+    if (!content) {
+      return [];
+    }
+
+    try {
+      const parsed = JSON.parse(content) as OpenAIReviewResponse;
+
+      return parsed.reviews || [];
+    } catch (error) {
+      throw new OpenAIError('Failed to parse review response', error);
+    }
   }
 }
