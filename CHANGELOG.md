@@ -1,6 +1,18 @@
 # 📦 Changelog
 
 All notable changes to this project will be documented in this file.
+### [1.0.1](https://github.com/nacorga/ai-pr-reviewer/compare/v1.0.0...v1.0.1) (2025-06-11)
+
+
+### Features
+
+* add custom review guidelines and improve context management for OpenAI reviews ([b8e2f9e](https://github.com/nacorga/ai-pr-reviewer/commit/b8e2f9ee38074b149e943df695844b1228b03507))
+
+
+### Bug Fixes
+
+* optimize fetching of review comments by using pagination in GitHubService ([60a9c7f](https://github.com/nacorga/ai-pr-reviewer/commit/60a9c7fa5a5ab98556af58da213a4f4a4d258cd6))
+
 ## 1.0.0 (2025-06-11)
 
 
