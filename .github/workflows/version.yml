@@ -31,50 +31,13 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Install standard-version
-        run: npm install --save-dev standard-version
-
-      - name: Check for changes
-        id: check_changes
-        run: |
-          if git diff --quiet HEAD^ HEAD; then
-            echo "No changes detected, skipping version bump"
-            echo "skip=true" >> $GITHUB_OUTPUT
-          else
-            echo "Changes detected, proceeding with version bump"
-            echo "skip=false" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Bump version
-        if: steps.check_changes.outputs.skip == 'false'
-        id: bump_version
-        run: |
-          git config --global user.email "github-actions@github.com"
-          git config --global user.name "github-actions"
-          npx standard-version \
-            --release-as patch \
-            --releaseCommitMessageFormat "chore(release): {{currentTag}} [skip ci]" \
-            --no-verify \
-            --tag-prefix "v"
-          git push --follow-tags origin main
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Get latest tag
-        if: steps.check_changes.outputs.skip == 'false'
-        id: get_tag
-        run: |
-          TAG=$(git describe --tags --abbrev=0)
-          echo "tag=$TAG" >> $GITHUB_OUTPUT
-
       - name: Create Release
-        if: steps.check_changes.outputs.skip == 'false'
         uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: ${{ steps.get_tag.outputs.tag }}
-          release_name: ${{ steps.get_tag.outputs.tag }}
+          tag_name: v1.0.0
+          release_name: v1.0.0
           body_path: CHANGELOG.md
           draft: false
           prerelease: false
