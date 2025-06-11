@@ -51,5 +51,5 @@ createServer(async (req: IncomingMessage, res: ServerResponse) => {
   res.writeHead(404, { 'Content-Type': 'text/plain' });
   res.end('Not Found');
 }).listen(port, () => {
-  console.log(`[Server] Ready to receive webhooks at http://localhost:${port}/webhooks`);
+  console.log('[Server] Ready to receive webhooks');
 });
