@@ -1,91 +1,119 @@
 import { Octokit } from '@octokit/rest';
 import { OpenAIService } from './openai.service';
-
-interface Patch {
-  path: string;
-  line: number;
-  position: number;
-  content: string;
-}
-
-interface CommentSuggestion {
-  path: string;
-  line: number;
-  message: string;
-}
+import { CommentSuggestion, Patch, PullRequestPayload } from '../types/github.types';
+import { GITHUB_COMMENT_IGNORE_FILE_PATTERNS, GITHUB_COMMENT_RATE_LIMIT_DELAY } from '../constants/config.constants';
 
 export class GitHubService {
-  private octokit = new Octokit({ auth: process.env.GITHUB_TOKEN as string });
-  private openai = new OpenAIService();
+  private octokit: Octokit;
+  private openaiSrv: OpenAIService;
 
-  async handlePullRequest(payload: any) {
-    const { action, pull_request: pr, repository: repo } = payload;
+  constructor() {
+    const token = process.env.GITHUB_TOKEN;
 
-    if (!['opened', 'reopened', 'synchronize'].includes(action)) return;
-
-    console.log(`[GitHub] Processing PR #${pr.number} (${action})`);
-
-    const patches = await this.collectPatches(repo.owner.login, repo.name, pr.number);
-
-    if (patches.length === 0) {
-      console.log(`[GitHub] No changes in PR #${pr.number}`);
-      return;
+    if (!token) {
+      throw new Error('GITHUB_TOKEN environment variable is required');
     }
 
-    console.log(`[GitHub] Reviewing ${patches.length} changed lines in PR #${pr.number}`);
+    this.octokit = new Octokit({ auth: token });
+    this.openaiSrv = new OpenAIService();
+  }
 
-    const suggestions = await this.openai.reviewPatches(
-      patches.map(({ path, line, content }) => ({ path, line, content })),
-    );
+  async handlePullRequest(payload: PullRequestPayload): Promise<void> {
+    try {
+      const { action, pull_request: pr, repository: repo } = payload;
 
-    await this.postComments(repo.owner.login, repo.name, pr.number, suggestions, patches);
+      if (!['opened', 'reopened', 'synchronize'].includes(action)) {
+        return;
+      }
+
+      console.log(`[GitHub] Processing PR #${pr.number} (${action})`);
+
+      try {
+        await this.octokit.rest.repos.getCollaboratorPermissionLevel({
+          owner: repo.owner.login,
+          repo: repo.name,
+          username: repo.owner.login,
+        });
+      } catch (error) {
+        console.error('[GitHub] Error checking permissions:', error);
+
+        throw new Error('Insufficient permissions to review pull requests');
+      }
+
+      const patches = await this.collectPatches(repo.owner.login, repo.name, pr.number);
+
+      if (patches.length === 0) {
+        console.log(`[GitHub] No changes in PR #${pr.number}`);
+        return;
+      }
+
+      console.log(`[GitHub] Reviewing ${patches.length} changed lines in PR #${pr.number}`);
+
+      const suggestions = await this.openaiSrv.reviewPatches(
+        patches.map(({ path, line, content }) => ({ path, line, content })),
+      );
+
+      await this.postComments(repo.owner.login, repo.name, pr.number, suggestions, patches, pr.head.sha);
+    } catch (error) {
+      console.error('[GitHub] Error processing pull request:', error);
+
+      throw error;
+    }
   }
 
   private async collectPatches(owner: string, repo: string, pull_number: number): Promise<Patch[]> {
-    const patches: Patch[] = [];
+    try {
+      const patches: Patch[] = [];
 
-    for await (const { data: files } of this.octokit.paginate.iterator(this.octokit.pulls.listFiles, {
-      owner,
-      repo,
-      pull_number,
-    })) {
-      for (const file of files) {
-        const ignoreGlobs = [/-lock\.json$/, /\.md$/];
-
-        if (!file.patch || ignoreGlobs.some((rx) => rx.test(file.filename))) {
-          continue;
-        }
-
-        const lines = file.patch.split('\n');
-
-        let currentLine = 0;
-        let position = 0;
-
-        for (const l of lines) {
-          if (l.startsWith('@@')) {
-            const m = /@@ -\d+,?\d* \+(\d+),?\d* @@/.exec(l);
-
-            if (m) currentLine = parseInt(m[1], 10);
+      for await (const { data: files } of this.octokit.paginate.iterator(this.octokit.pulls.listFiles, {
+        owner,
+        repo,
+        pull_number,
+      })) {
+        for (const file of files) {
+          if (!file.patch || GITHUB_COMMENT_IGNORE_FILE_PATTERNS.some((rx) => rx.test(file.filename))) {
             continue;
           }
 
-          position++;
-          if (l.startsWith('+')) {
-            patches.push({
-              path: file.filename,
-              line: currentLine,
-              position,
-              content: l.slice(1),
-            });
-            currentLine++;
-          } else if (!l.startsWith('-')) {
-            currentLine++;
+          const lines = file.patch.split('\n');
+
+          let currentLine = 0;
+          let position = 0;
+
+          for (const l of lines) {
+            if (l.startsWith('@@')) {
+              const m = /@@ -\d+,?\d* \+(\d+),?\d* @@/.exec(l);
+
+              if (m) {
+                currentLine = parseInt(m[1], 10);
+              }
+
+              continue;
+            }
+
+            position++;
+
+            if (l.startsWith('+')) {
+              patches.push({
+                path: file.filename,
+                line: currentLine,
+                position,
+                content: l.slice(1),
+              });
+              currentLine++;
+            } else if (!l.startsWith('-')) {
+              currentLine++;
+            }
           }
         }
       }
-    }
 
-    return patches;
+      return patches;
+    } catch (error) {
+      console.error('[GitHub] Error collecting patches:', error);
+
+      throw error;
+    }
   }
 
   private async postComments(
@@ -94,49 +122,47 @@ export class GitHubService {
     pull_number: number,
     suggestions: CommentSuggestion[],
     patches: Patch[],
-  ) {
-    const [{ data: pr }, { data: existing }] = await Promise.all([
-      this.octokit.rest.pulls.get({ owner, repo, pull_number }),
-      this.octokit.rest.pulls.listReviewComments({ owner, repo, pull_number }),
-    ]);
+    pr_head_sha: string,
+  ): Promise<void> {
+    try {
+      const comments = suggestions
+        .map((s) => {
+          const patch = patches.find((p) => p.path === s.path && p.line === s.line);
 
-    const seen = new Set(existing.map((ec) => `${ec.path}|${ec.position}|${ec.body}`));
+          if (!patch) {
+            return null;
+          }
 
-    const comments = suggestions.flatMap((s) => {
-      const patch = patches.find((p) => p.path === s.path && p.line === s.line);
+          return {
+            path: s.path,
+            line: patch.line,
+            side: 'RIGHT' as const,
+            body: s.message,
+          };
+        })
+        .filter((comment): comment is NonNullable<typeof comment> => comment !== null);
 
-      if (!patch) return [];
-
-      const key = `${s.path}|${patch.position}|${s.message}`;
-
-      if (seen.has(key)) {
-        return [];
+      if (comments.length === 0) {
+        return;
       }
 
-      seen.add(key);
+      for (const comment of comments) {
+        await this.octokit.rest.pulls.createReviewComment({
+          owner,
+          repo,
+          pull_number,
+          commit_id: pr_head_sha,
+          ...comment,
+        });
 
-      return {
-        path: s.path,
-        position: patch.position,
-        body: s.message,
-      };
-    });
+        await new Promise((resolve) => setTimeout(resolve, GITHUB_COMMENT_RATE_LIMIT_DELAY));
+      }
 
-    if (comments.length === 0) {
-      console.log('[GitHub] No new comments to post.');
+      console.log(`[GitHub] Published ${comments.length} comments.`);
+    } catch (error) {
+      console.error('[GitHub] Error posting comments:', error);
 
-      return;
+      throw error;
     }
-
-    const { data: review } = await this.octokit.rest.pulls.createReview({
-      owner,
-      repo,
-      pull_number,
-      commit_id: pr.head.sha,
-      event: 'COMMENT',
-      comments,
-    });
-
-    console.log(`[GitHub] Published review #${review.id} with ${comments.length} comments.`);
   }
 }
