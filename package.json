@@ -20,17 +20,15 @@
     "cd"
   ],
   "author": "Ignacio Cortés García",
-  "license": "ISC",
+  "license": "MIT",
   "description": "",
   "dependencies": {
     "@octokit/rest": "^22.0.0",
     "@octokit/webhooks": "^14.0.2",
     "dotenv": "^16.5.0",
-    "express": "^5.1.0",
     "openai": "^5.1.1"
   },
   "devDependencies": {
-    "@types/express": "^5.0.3",
     "@types/node": "^22.15.30",
     "husky": "^9.1.7",
     "prettier": "^3.5.3",
