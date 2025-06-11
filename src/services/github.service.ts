@@ -153,13 +153,17 @@ export class GitHubService {
       }
 
       for (const comment of comments) {
-        await this.octokit.rest.pulls.createReviewComment({
+        const params = {
           owner,
           repo,
           pull_number,
           commit_id: pr_head_sha,
           ...comment,
-        });
+        };
+
+        console.log(`[GitHub] Posting comment: ${JSON.stringify(params)}`);
+
+        await this.octokit.rest.pulls.createReviewComment(params);
 
         await new Promise((resolve) => setTimeout(resolve, GITHUB_COMMENT_RATE_LIMIT_DELAY));
       }
