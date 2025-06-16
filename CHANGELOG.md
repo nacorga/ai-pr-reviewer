@@ -1,6 +1,13 @@
 # 📦 Changelog
 
 All notable changes to this project will be documented in this file.
+### [1.0.2](https://github.com/nacorga/ai-pr-reviewer/compare/v1.0.1...v1.0.2) (2025-06-16)
+
+
+### Bug Fixes
+
+* update OpenAI configuration parameters for improved performance ([748a9b4](https://github.com/nacorga/ai-pr-reviewer/commit/748a9b4c624d69899ec2cc909ea23b358c089572))
+
 ### [1.0.1](https://github.com/nacorga/ai-pr-reviewer/compare/v1.0.0...v1.0.1) (2025-06-11)
 
 
